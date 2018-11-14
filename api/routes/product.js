@@ -1,155 +1,41 @@
 const express = require('express');
 const route = express.Router();
-const  mongoose = require('mongoose');
-const Product = require('../model/product');
+const checkAuth = require('../middelware/check-auth');
+const productController = require('../controller/product');
 
+const multer = require('multer');
+const storage = multer.diskStorage({
+    destination : function(req,file,cb){
+        cb(null,'uploads/');
+    },filename :function(req,file,cb){
+        let d = new Date();
+        let datestring = d.getDate()  + "" + (d.getMonth()+1) + "" + d.getFullYear() + "" + d.getHours() + "" + d.getMinutes()+ "" + d.getSeconds() ;
+        cb(null,'FILE_'+ datestring + "." + file.originalname.split('.').pop());
+    }
+});
+const fileFilter = (req,file,cb)=>{
+    if(file.mimetype == 'image/jpeg' || file.mimetype == 'image/png'){
+        cb(null,true);
+    }else{
+        cb(null,false);
+    }
+}
+const upload = multer({ storage : storage ,
+                        limits:{
+                            fieldSize:1027*1024*5
+                        },
+                        fileFilter :fileFilter
+                });
 //==========================================get all
-route.get('/', (req , res , next)=> {
-
-    Product.find().select('_id name price').then(results=>{
-        let response = {
-            count : results.length,
-            data : results.map(result=>{
-                return {
-                    id : result._id,
-                    price : result.price,
-                    name : result.name,
-                    request : {
-                        type:'GET',
-                        url :'http://localhost:3000/products/'+ result._id
-                    }
-                }
-            })
-        }
-        return res.status(200).json(response);
-    }).catch(error=>{
-        res.status(500).json({
-            message: error.message
-        });
-    });
-});
+route.get('/', checkAuth , productController.products_get_all );
 //==========================================get by id
-route.get('/:id',( req,res,next ) =>{
-    try{
-        let id = req.params.id;
-        let responseProduct = Product.findById({_id:id}).then(result=>{
-            let response = {
-                message:'Get value success !',
-                data:{
-                    id : result._id,
-                    price : result.price,
-                    name : result.name,
-                    request : {
-                        type:'GET',
-                        url :'http://localhost:3000/products/'+ result._id
-                    }
-                }
-            }
-            return res.status(200).json(response);
-        })
-        .catch(error=>{
-            res.status(500).json({
-                message: error.message
-            });
-        });;
-    }catch(error){
-        res.status(500).json({
-            message: error.message
-        });
-    }   
-});
+route.get('/:id',checkAuth , productController.products_get_by_ID );
 //==========================================update===============================
-route.post('/:id', (req,res,next)=>{
-    try{
-        let id = req.params.id;
-        let newname = req.body.name;
-        let newprice = req.body.price;
-
-        Product.update( { _id : id },{ $set:{ name :newname , price : newprice} } ).then(result=>{
-            let response = {
-                message:'Update success !',
-                data:{
-                    id : result._id,
-                    price : result.price,
-                    name : result.name,
-                    request : {
-                        type:'GET',
-                        url :'http://localhost:3000/products/'+ result._id
-                    }
-                }
-            }
-            return res.status(202).json(response);
-        })
-           .catch(error=>{
-                res.status(500).json({
-                    message: error.message
-                });
-            });
-    }catch(err){
-        return res.status(500).json({
-            message : err.message
-        });
-    }
-});
+route.post('/:id', checkAuth , productController.products_update );
 //==========================================create===============================
-route.post('/',(req,res,next)=>{
-    try{
-        let product = new Product({
-            _id : new mongoose.Types.ObjectId(),
-            name:req.body.name,
-            price:req.body.price,
-        });
-        product.save().then(result=>{
-            let response = {
-                message:'Insert successfully !',
-                data:{
-                    id : result._id,
-                    price : result.price,
-                    name : result.name,
-                    request : {
-                        type:'GET',
-                        url :'http://localhost:3000/products/'+ result._id
-                    }
-                }
-            }
-            return res.status(202).json(response);
-        }).catch(err=>{
-            return res.status(500).json({
-                message : err.message
-            });
-        });
-    }catch(err){
-        return res.status(500).json({
-            message : err.message
-        });
-    }
-});
+route.post('/' , checkAuth ,  upload.single('image'), productController.products_create );
 //==========================================delete===============================
-
-route.delete('/:id',(req,res,next)=>{
-    try{
-        let id = req.params.id;
-        Product.remove({_id:id},function(err,result){
-            if(err){
-                return res.status(500).json({
-                    message:err.message
-                });
-            }else{
-                return res.status(500).json({
-                    message: "Deleted success !"
-                });
-            }
-        }).catch(err=>{
-            return res.status(500).json({
-                message : err.message
-            });
-        });
-    }catch(err){
-        return res.status(500).json({
-            message:err.message
-        });
-    }
-});
+route.delete('/:id', checkAuth , productController.products_delete );
 
 
 module.exports = route;
